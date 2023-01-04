@@ -1,43 +1,65 @@
 import { type NextPage } from "next";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Head from "next/head";
-import Link from "next/link";
 import * as toxicity from "@tensorflow-models/toxicity";
 import { api } from "../utils/api";
+import { div } from "@tensorflow/tfjs";
 
 const threshold = 0.5;
-const ListItem = ({ data, sentence }) => {
-  const stringifiedData = JSON.stringify(data, null, 2);
+const ListItem = ({ data, sentences }) => {
+  const { label, results } = data;
+  // creates a card for each toxicity label with a list of sentences that match that label
+  // indicates whether the sentence is toxic with red X or green checkmark
+  const sentenceList = results.map((result, idx) => {
+    return (
+      <div key={idx} className="mb-1 flex items-center justify-start">
+        <span className="mr-6 text-3xl">{sentences[idx]}</span>
+        {result.match ? (
+          <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-black bg-red-600 font-bold">
+            X
+          </span>
+        ) : (
+          <span className="flex h-6 w-6 rounded-full border-2 border-black bg-green-600 "></span>
+        )}
+      </div>
+    );
+  });
+
   return (
     <>
-      <h2>{sentence}</h2>
-      <div>{stringifiedData}</div>
+      <div className="container mb-3 rounded-lg bg-white bg-opacity-75 py-3 px-3">
+        <h1 className="flex flex-col gap-4 ">{label}</h1>
+        <div className="mb-10 ">{sentenceList}</div>
+      </div>
     </>
   );
 };
+
 const Home: NextPage = () => {
   const [statements, setStatements] = useState(null);
-  const [sentences, setSentences] = useState([
-    "You are a poopy head!",
-    "I like turtles",
-    "Shut up!",
-  ]);
+  const [sentences, setSentences] = useState(["I'm horny!"]);
   const hello = api.example.hello.useQuery({ text: "from tRPC" });
-  toxicity.load(threshold).then((model) => {
-    model.classify(sentences).then((predictions) => {
-      // semi-pretty-print results
-      setStatements(predictions);
-    });
-  });
+  useEffect(() => {
+    if (!statements) {
+      toxicity.load(threshold).then((model) => {
+        model.classify(sentences).then((predictions) => {
+          // semi-pretty-print results
+          setStatements(predictions);
+        });
+      });
+    }
+  }, []);
   if (!statements) return;
+
   const list = statements.map((statement, idx) => {
-    if (idx === 0) console.log(statement);
     return (
-      <ListItem
-        key={`${idx}-${statement.name}`}
-        sentence={sentences[idx]}
-        data={statement.results}
-      />
+      <>
+        <ListItem
+          key={`${idx}-${statement.name}`}
+          sentences={sentences}
+          data={statement}
+        />
+      </>
     );
   });
   return (
@@ -53,9 +75,7 @@ const Home: NextPage = () => {
             Unlock{" "}
             <span className="text-[hsl(280,100%,70%)]">Tensor Flow JS</span>
           </h1>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
-            {list}
-          </div>
+          <div className="flex  flex-col">{list}</div>
           <p className="text-2xl text-white">
             {hello.data ? hello.data.greeting : "Loading tRPC query..."}
           </p>
